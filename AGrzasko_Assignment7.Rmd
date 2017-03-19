@@ -1,0 +1,219 @@
+---
+title: 'DATA 605:  Week 7 Assignment'
+author: "Aaron Grzasko"
+date: "3/18/2017"
+output: 
+    html_document:
+        theme: default
+        highlight: haddock
+---  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment=NA) 
+```
+
+## Problem Set 1
+
+**This week, you’ll have only one programming assignment. Please write a function to compute the expected value and standard deviation of an array of values.  Compare your results with that of R’s mean and std functions.**  
+  
+First, create a random vector of numbers:    
+```{r}
+# Random sample of 15 integer values between 1 and 100, with replacement. 
+set.seed(1)
+sample_data <- sample(100, 15, replace = TRUE)
+sample_data
+```
+  
+### Mean Functions  
+
+We can generate the mean (i.e. expected value) of our data in a variety of ways.  
+ 
+Here is a function that calculate the mean of our sample using loops:  
+
+```{r}
+loopy_mean <- function(mydata){
+  # n = number of data points
+  n <- 0
+  # sigma = running total sum of data points
+  sigma <- 0
+  
+  # loop through data
+  for (val in mydata){
+    sigma <- sigma + val
+    n <- n + 1
+  }
+  # mean is equal to sum of values, divided by number of data points
+  sigma / n
+}
+
+loopy_mean(sample_data)
+```
+
+If we want to write a more concise function, we can take advantage of R's built-in `sum()` and `length()` functions:  
+```{r}
+easier_mean <- function(mydata) return(sum(mydata) / length(mydata))
+
+easier_mean(sample_data)
+
+```
+
+Rather than writing our own function, we can simply take advantage of R's built-in `mean()` function:  
+```{r}
+mean(sample_data)
+```
+  
+### Standard Deviation Functions  
+  
+For this homework, we assume we are interested in the sample standard deviation.  
+  
+Once again, there are multiple approaches to generating this value.  
+  
+Here is an example using loops:  
+
+```{r}
+# function to calcluate std using formula, Sum[(xi - mu)^2] / (n - 1)
+
+loopy_std <- function(mydata){
+  # sigma = running sum total of (xi - mu)^2
+  sigma <- 0
+  
+  #n = number of data points
+  n <- length(mydata)  
+  
+  for (val in mydata){
+    sigma <- (val - mean(mydata))^2 + sigma
+  }
+  
+  sqrt(sigma / (n-1))
+  
+}
+
+loopy_std(sample_data)
+```
+Here is another custom function without loops:     
+```{r}
+# sample stdev = sqrt([E(X^2) - E(X)^2] * n / (n-1))
+easier_std <- function(mydata) {
+  sqrt((sum(mydata^2) / length(mydata) - mean(mydata)^2) * length(mydata)/(length(mydata)-1))
+}
+
+easier_std(sample_data)
+```
+Finally, we can calculate standard deviation using the built-in `sd()` function:  
+```{r}
+sd(sample_data)
+```
+**Now, consider that instead of being able to neatly fit the values in memory in an array, you have an infinite stream of numbers coming by. How would you estimate the mean and standard deviation of such a stream? Your function should be able to return the current estimate of the mean and standard deviation at any time it is asked. Your program should maintain these current estimates and return them back at any invocation of these functions. (Hint: You can maintain a rolling estimate of the mean and standard deviation and allow these to slowly change over time as you see more and more new values).**
+  
+The key to creating these rolling estimate functions is to take advantage of R's double arrow assignment operator, "<<-".  
+  
+Let's first generate some additional sample data to feed to our forthcoming functions:  
+
+```{r}
+# create 15 additional random integers between 1 and 100  
+set.seed(2)
+sample_data2 <- sample(100, 15, replace = TRUE)
+sample_data2
+```
+
+
+### Mean Accumulator Function  
+  
+Here is a function to calculate the rolling mean:
+```{r}
+# function to return rolling mean
+# if no argument is supplied, then return current rolling estimate
+# otherwise, update mean with new data
+
+mean_accumulator <- function() {
+  # initialize variables for sum of data points (sigma) and number of observations (n)
+  # set values to zero if not previously invoked
+  sigma <- 0
+  n <- 0
+  
+  # update sigma and n with additional values, if applicable
+  function(mydata=NULL){
+    if (!is.null(mydata)){
+      n <<- n + length(mydata)
+      sigma <<- sigma + sum(mydata)
+    }
+    # re-calculate mean with latest update to sigma and n
+    sigma / n
+  }
+}
+```
+
+Now, let's test our function:
+
+```{r}
+# create instance of mean_accumulator function
+my_mean <- mean_accumulator()  
+
+# calculate mean using first 15 values from sample_data object
+my_mean(sample_data)
+
+# update rolling mean with additional data from sample_data2
+my_mean(sample_data2)
+
+# calculate mean of combined samples using built-in mean() function
+mean(c(sample_data,sample_data2))
+
+# verify that custom accumulator function is identical to mean of combined samples
+mean(c(sample_data,sample_data2)) == my_mean()
+
+```
+### Standard Deviation Accumulator Function
+
+```{r}
+# function to return rolling, sample standard deviation
+# if no argument is supplied, then return current rolling estimate
+# otherwise, update standard deviation with new data
+
+std_accumulator <- function(){
+  
+  # initialize variables for sum of data points (sigma), sum of squared data points (sumsq),
+  # and number of observations (n)
+  # set values to zero if not previously invoked
+  
+  n <- 0  
+  sumsq <- 0
+  sigma <- 0
+  
+  # update sigma, sumsq, and n with additional values, if applicable
+  function(mydata=NULL){
+    if(!is.null(mydata)){
+      sumsq <<- sumsq + sum(mydata^2)
+      sigma <<- sigma + sum(mydata) 
+      n <<- n + length(mydata)
+    }
+    
+  # return rolling standard deviation
+    sqrt((sumsq / n - (sigma / n)^2) * n / (n-1))
+  }
+}
+```
+
+Now, let's test the std_accumulation() function:  
+```{r}
+# initialize std_accumulator() with new instance
+my_std <- std_accumulator()
+
+# calculate stdev using data from sample_data
+my_std(sample_data)
+
+# update stdev with data points from sample_data2
+my_std(sample_data2)
+
+# calculate stdev using sd() function on combined sample data objects
+sd(c(sample_data,sample_data2))
+
+# verify that custom accumulator function is identical to stdev of combined samples   
+sd(c(sample_data,sample_data2)) == my_std()
+```
+
+
+### References  
+- Hadley Wickham provides an excellent tutorial on functional programming and how to use the double arrow assignment operator in his book, [Advanced R](http://adv-r.had.co.nz/Functional-programming.html).    
+
+
+
